@@ -1,0 +1,220 @@
+---
+title: "Colombia-2016 Peace Referendum"
+author: "Guillermo Fremd Kanovich"
+date: "6/27/2020"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+#WORK IN PROGRESS, DRAFT. 
+
+
+## Colombia - Intro
+
+The Effect of Political Violence on Affected Communities’ Willingness to Compromise: The Case of the 2016 Peace Referendum in Colombia.
+
+In August 2016, after more than 50 years of violence, the Colombian government reached a final negotiated settlement with the militan organization Revolutionary Armed Forces of Colombia (FARC), which was taken to the polls to be ratified by the Colombian population in October of the same year. 
+
+Baseline question: 
+
+“How did the level of terrorism in each municipality in Colombia affect the level of support for the 2016 peace agreement with the DARC?”
+
+Were those municipalities that suffered higher levels of violence less willing to support the final peace agreement with the terrorist organization, or more? Can we identify a relationship (maybe non-linear) between the level of violence suffered in each municipality and its level of support for the peace referendum?
+
+The data for the dependent variable “Level of support for the peace agreement referendum” was obtained from the UN Office for the Coordination of Humanitarian Affairs (OCHA) country office in Colombia. (https://data.humdata.org/dataset/resultados-plebiscito-por-la-paz-en-colombia). This variable simply indicates what percentage voted in favour of the proposed Peace Agreement with the FARC.
+
+The independent variable is “Armed Conflict Incidence Level Index”, which was developed by Colombia’s National Planning Department. https://colaboracion.dnp.gov.co/CDT/Poltica%20de%20Vctimas/Construcci%C3%B3n%20de%20Paz/Documento%20%C3%ADndice%20de%20incidencia%20del%20conflicto%20armado.pdf
+
+My dataset comprises some other variables, including a dicotomic variable which indicates whether prior to the referendum there existed active armed groups in the Municipality.
+
+```{r, echo=FALSE}
+rawdata <- read.csv("DataColombia.csv")
+
+```
+
+Let's divide our data in two subsets: one including those municipalities where armed groups were active, and one comprising those that where free of armed groups:
+
+
+```{r,echo=FALSE}
+datawitharmed <- rawdata[rawdata$ArmedGroups==1, ]  
+datawithoutarmed <- rawdata[rawdata$ArmedGroups!=1, ]
+```
+
+## Initial exploration
+```{r,echo=FALSE}
+summary(rawdata$Votedyes)
+
+boxplot(rawdata$Votedyes,main="Level of support to the peace deal", col = "gold")
+
+```
+```{r,echo=FALSE}
+plot(rawdata$ConflictIndex, rawdata$Votedyes, xlab="Incidence of the Conflict", ylab="Level of support to the peace deal", col="gold2")
+
+
+```
+Hmm that scatter plot is not very clear
+
+What is the correlation between my two main variables, Incidence of the Conflict and Level of support for the Peace Agreement?
+```{r,echo=FALSE}
+cor(rawdata$Votedyes,rawdata$ConflictIndex)
+```
+Correlation: 0.14... not very high.
+
+What if we separate those municipalities with armed groups from those without?
+
+```{r,echo=FALSE}
+cor(datawithoutarmed$Votedyes,datawithoutarmed$ConflictIndex)
+cor(datawitharmed$Votedyes,datawitharmed$ConflictIndex)
+```
+Clearlly, the correlation between the level of incidence of the conflict and the level of support for the Peace Agreement is signficantly higher in those municipalities where armed groups are present (0.22), than that of municipalities without active armed groups (0.05).
+
+
+## Dividing municipalities in groups by level of incidence of the conflict
+
+My dataset has an additional variable categorising the municipalities in 5 groups (from 1 to 5) according to the level of incidence of the conflict. Let's see if we can identify a (statistically significant) different level of support for the referendum in each of these groups. 
+
+Let's first visualise the data, and then run One-way anova
+
+```{r,echo=FALSE}
+library(tidyverse)
+library(tidyverse)
+library(ggpubr)
+library(rstatix)
+
+ggboxplot(rawdata, x = "ConflictCategory", y = "Votedyes", ylab = "Support for the Peace agreement", xlab = "Conflict incidence level",color = "black", fill = "green3")
+```
+
+This appears to show something interesting: it seems that those municipalities that had a very high and very low incidence of the concflit, where more supportive for the peace referendum, than those municipalities where the conflict had an intermediate level of incidence.
+
+Let's now try to see if the same "shame" is visile both if we consider separatelly the municipalities where armed groups are present, and those without presente of armed groups:
+
+```{r,echo=FALSE}
+ggboxplot(datawithoutarmed, x = "ConflictCategory", y = "Votedyes", ylab = "Support for the Peace agreement", xlab = "Conflict incidence level",color = "black", fill = "yellow2",main="Municipalities with presence of armed groups")
+ggboxplot(datawitharmed, x = "ConflictCategory", y = "Votedyes",ylab = "Support for the Peace agreement", xlab = "Conflict incidence level",color = "black", fill = "pink", main="Municipalities without presence of armed groups")
+```
+
+Yep..! We observe the same dinamic both in municipalities with and without armed groups.
+
+Let's see now if the differences that we identify between the groups are statistically significant, using a one-way anova test and a Tukey's test. 
+(To conduct anovas test we should searh for outliers, and we should make sure that certain assumptions are not violated, but I will not do so in this excercise).
+
+```{r,echo=FALSE}
+anovatest <- aov(Votedyes ~ ConflictCategory, data = rawdata)
+
+summary(anovatest)
+
+
+rawdata$ConflictCategory=factor(rawdata$ConflictCategory)
+
+anovaWithArmed <- rawdata %>% tukey_hsd(Votedyes~ConflictCategory)
+anovaWithArmed
+
+
+```
+
+The Anova test shows that there exist statisticall signifcant differences between the groups. In other words, we can rule out the null hypothesis: that all the 5 groups presented the same level of support for the referendum 
+
+The Tukey test shows that the only differences that are not statistically significative are the difference between groups 1 and 4, and between 2 and 3. This is coherent with a U-shaped dinamic as the one we saw in the plots before: municipalitites in Groups 2 and 3, which suffered the conflict with the FARC in intermediate levels, presented a lower level of support for the Peace Agreement than municipalitites in Groups 1 and 4, where the incidence of the conflict was Low and High, respectively. Finally, municipalitites in Group 5 (those municipalitiies where the conflict with the FARC had a Very High level of incidence), presented the highest levels of support for the peace deal. 
+
+
+## Regressions
+
+What about trying to fit simple linear regressios? Let's do first with the complete dataset. 
+```{r,echo=FALSE}
+lmraw.fit=lm(Votedyes~ConflictIndex, data=rawdata)
+summary(lmraw.fit)
+plot(rawdata$ConflictIndex,rawdata$Votedyes,col="red3", main="All municipalities", xlab="Incidence of the conflict", ylab="Support for the peace agreement")
+abline(lmraw.fit,col="blue")
+```
+
+While there is a statistically significative positive relationship between the Incidence of the conflict and the level of support for the referendum, the R2 shows that this (too simple) model explains solely a 2% of the variance. It is very poor.
+
+Now let's try to see what happens if we separate those municipalities were armed groups were present, from those municipalitites where there were no armed groups, and see if we have the same results.
+
+```{r,echo=FALSE}
+lmwarmed.fit=lm(Votedyes~ConflictIndex, data=datawitharmed)
+summary(lmwarmed.fit)
+plot(datawitharmed$ConflictIndex,datawitharmed$Votedyes,main="Municipalities with presence of  armed groups", xlab="Incidence of the conflict", ylab="Support for the peace agreement")
+abline(lmwarmed.fit,col="red")
+
+lmwoarmed.fit=lm(Votedyes~ConflictIndex, data=datawithoutarmed)
+summary(lmwoarmed.fit)
+plot(datawithoutarmed$ConflictIndex,datawithoutarmed$Votedyes,main="Municipalities without presence of  armed groups", xlab="Incidence of the conflict", ylab="Support for the peace agreement")
+abline(lmwoarmed.fit,col="green")
+```
+
+Interesting! Thanks to these regressions, we can see that actually the level of incidence of the conflict was NOT a statistically significant in those municipalites where, at the time of the referendum, there was no presence of armed groups.
+
+
+
+## Quadratic regressions?
+What happens if we try to fint a quadratic model?
+```{r,echo=FALSE}
+rawquadratic.fit=glm(Votedyes~poly(ConflictIndex,2), data=rawdata )
+
+summary(rawquadratic.fit)
+
+
+```
+
+The quadratic regression above shows that the quadratic term is not statstically significant.
+
+## Logistic regression**
+
+Now, let's  try to fit a logistic regression to see if we could predict, using several variables, whether more than 50% of the voters supported the peace agreement in the referendum. We will only use the subset that includes municipalitites with presence of armed groups, because we have seen before that in those municipalitites the level of incidence of the conflict was a statistically significant factor.
+
+Before moving forward, let's create a dicotomic variable indicing whether more thab 50% of the voters supported the peace deal in the referendum: 0 means that less than 50% voted for the agreement, and 1 means than more than 50% supported it.
+
+```{r,echo=FALSE}
+
+datawitharmed$voteabove50= rep(1,nrow(datawitharmed))
+
+datawitharmed$voteabove50[datawitharmed$Votedyes<50] <- 0
+```
+
+We should also divide the data in two subsets: one to fit the quadratic regression, and one to test it:
+
+
+```{r, echo=FALSE}
+set.seed(1)
+all <- 1:nrow(datawitharmed)
+trainsample <- sort(sample(all, round(nrow(datawitharmed)*0.70,digits = 0),replace=FALSE))
+testsample <- all[-trainsample]
+
+traindata <- datawitharmed[trainsample,]
+testdata <- datawitharmed[testsample,]
+```
+
+Once we have divided the data into training and testing datasets, let's fit  the quadratic regression using the training dataset, and let's see how well it performs with the testing data. 
+
+We will use 3 variables to fit the quadratic regression: Level of Incidence of the Conflict (the one we used before), as well as Population and Poverty Index:
+
+```{r,echo=FALSE}
+glmwitharmed.fit <- glm(voteabove50~ConflictIndex+Population+PovertyIndex2013, data = traindata, family = binomial)
+
+glmwitharmed.probs <- predict(glmwitharmed.fit, type = "response" ,newdata=testdata)
+glmwitharmed.pred <- rep(1,nrow(testdata))
+glmwitharmed.pred[glmwitharmed.probs<.5] <- 0
+
+```
+
+Let's now see how many "correct" answers our predictor returned:
+
+
+```{r,echo=FALSE}
+table(prediction = glmwitharmed.pred, truth = testdata$voteabove50)
+summary(glmwitharmed.fit)
+mean(glmwitharmed.pred==testdata$voteabove50)
+mean(glmwitharmed.pred != testdata$voteabove50)
+
+```
+
+Interestingly, our model clasiffied more than 68% of the cases correctly. However, from the three variables, only poverty index appears to be statistically significant. Also interesting, the negative term indicates that the higher the Poverty Index in a municipality, the less likely such municipality was support the refrendum. 
+
+## TO BE CONTINUED...
+
+
+
+
