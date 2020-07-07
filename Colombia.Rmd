@@ -161,7 +161,7 @@ summary(rawquadratic.fit)
 
 The quadratic regression above shows that the quadratic term is not statstically significant.
 
-## Logistic regression**
+## Logistic regression
 
 Now, let's  try to fit a logistic regression to see if we could predict, using several variables, whether more than 50% of the voters supported the peace agreement in the referendum. We will only use the subset that includes municipalitites with presence of armed groups, because we have seen before that in those municipalitites the level of incidence of the conflict was a statistically significant factor.
 
@@ -213,7 +213,33 @@ mean(glmwitharmed.pred != testdata$voteabove50)
 
 Interestingly, our model clasiffied more than 68% of the cases correctly. However, from the three variables, only poverty index appears to be statistically significant. Also interesting, the negative term indicates that the higher the Poverty Index in a municipality, the less likely such municipality was support the refrendum. 
 
-## TO BE CONTINUED...
+## Classification Tree
+
+```{r}
+library(tree)
+set.seed(1)
+traindata$voteabove50=factor(traindata$voteabove50)
+testdata$voteabove50=factor(testdata$voteabove50)
+
+traintree <- tree(voteabove50~ConflictIndex+Population+PovertyIndex2013,data=traindata)
+summary(traintree)
+plot(traintree)
+text(traintree, pretty=1, cex=0.5)
+```
+```{r}
+set.seed(1)
+tree.pred.test <- predict(traintree, testdata, type="class")
+table(Prediction=tree.pred.test,Reality=testdata$voteabove50)
+mean(tree.pred.test==testdata$voteabove50)
+
+```
+
+Predicting the results of the referendum (whether the Yes would obtain more than 50% of the votes) in each municipality a 68% of the times looks quite good. However, we must pay attention to the fact that, when our tree predicted "0" (i.e., that the No would win) (39 cases), only 20 of those were correct, as in 19 of them the real result was "1" (i.e., that the Yes won). We had a 48% of false negatives, which is very high. We might try prunning the tree to see if we obtain better results (to reduce the overfitting from the training dataset), but also changing the variables we used to build the tree.
+
+
+
+
+
 
 
 
