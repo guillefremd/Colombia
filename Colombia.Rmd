@@ -234,11 +234,57 @@ mean(tree.pred.test==testdata$voteabove50)
 
 ```
 
-Predicting the results of the referendum (whether the Yes would obtain more than 50% of the votes) in each municipality a 68% of the times looks quite good. However, we must pay attention to the fact that, when our tree predicted "0" (i.e., that the No would win) (39 cases), only 20 of those were correct, as in 19 of them the real result was "1" (i.e., that the Yes won). We had a 48% of false negatives, which is very high. We might try prunning the tree to see if we obtain better results (to reduce the overfitting from the training dataset), but also changing the variables we used to build the tree.
+Predicting the results of the referendum (whether the Yes would obtain more than 50% of the votes) in each municipality a 68% of the times looks quite good. However, we must pay attention to the fact that, when our tree predicted "0" (i.e., that the No would win) (39 cases), only 20 of those were correct, as in 19 of them the real result was "1" (i.e., that the Yes won). We had a 48% of false negatives, which is very high. We might try prunning the tree to see if we obtain better results (to reduce the overfitting from the training dataset), but let's first changing the variables  used to build the tree.
+
+Let's first start over, with other variables in the tree.
+
+
+```{r}
+newtree <- tree(voteabove50~ConflictIndex+Population+PovertyIndex2013+ArmedGroups+Rurality2010+IDHMpnud2010+ProporTotAff,data=traindata)
+summary(newtree)
+plot(newtree)
+text(newtree, pretty=1, cex=0.5)
+```
 
 
 
 
+```{r}
+set.seed(1)
+newtree.pred.test <- predict(newtree, testdata, type="class")
+table(Prediction=newtree.pred.test,Reality=testdata$voteabove50)
+mean(newtree.pred.test==testdata$voteabove50)
+```
+
+As we can observe, by adding more variables to the tree, it's prediction power improved a little, from 68% to 72%. But, let's prune it, hopefully that will help us obtain not only a simple tree, but also one more powerful.
+
+
+```{r}
+set.seed(1)
+cv.newtree=cv.tree(newtree,FUN=prune.misclass)
+cv.newtree
+```
+the CV.tree function indicates that the optimal level of complexity is 20 (not pruning the tree), given that it minimise the number of misclasified (68). However, and given that this cross validations uses the data from the training dataset, it is possible that it is overfitting and, thus, a tree with level 3, which mislasified a bit more cases but is much  simpler, might perform better when we use the testing data. So, let's prune the tree with complexity 3, and let's see if it obtains a better prediction;
+
+```{r}
+pruned.tree=prune.misclass(newtree, best=3)
+
+
+plot(pruned.tree)
+text(pruned.tree, pretty=1, cex=0.8)
+
+set.seed(1)
+pruned.tree.pred.test <- predict(pruned.tree, testdata, type="class")
+table(Prediction=pruned.tree.pred.test,Reality=testdata$voteabove50)
+mean(pruned.tree.pred.test==testdata$voteabove50)
+
+```
+This tree predicted efficiently in 80% of the cases the result of the referendum, a significant improvement. This tree uses only two variables: ProporTotAff (a variable computed by me, see explanation below) and ConflictIndex, which we explained before.
+
+
+ProporTotAff is simply the proportion of individuals affected by the conflict between 1984 and 2016 by the population of the municipality. It was calculated in the following way: (sum of the number of individuals that were directly affected in the municipality each year between 1984 and 2016)/(the population of the municipality). 
+
+We had not used this variables in the previous test we did before this, but given that this suggest that the ProporTotAff variable might have a interesting predective power, we might decide to start using it, and even maybe we should incorporate this variable to the tests we did before.
 
 
 
